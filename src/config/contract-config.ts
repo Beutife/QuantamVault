@@ -1,17 +1,17 @@
-// REPLACE THIS WITH YOUR DEPLOYED CONTRACT ADDRESS
-export const CONTRACT_ADDRESS = "0xYOUR_CONTRACT_ADDRESS_HERE"
+// Deployed Contract Address (PAS Testnet)
+export const CONTRACT_ADDRESS = "0xc8F6fF01fd1D981e627a8102fc334D360Af7384b"
 
-// Moonbase Alpha Network Config
+// Polkadot Hub TestNet Network Config
 export const NETWORK_CONFIG = {
-  chainId: '0x507', // 1287 in hex
-  chainName: 'Moonbase Alpha',
+  chainId: '0x1910A6E6', // 420420422 in hex
+  chainName: 'Polkadot Hub TestNet',
   nativeCurrency: {
-    name: 'DEV',
-    symbol: 'DEV',
+    name: 'DOT',
+    symbol: 'DOT',
     decimals: 18
   },
-  rpcUrls: ['https://rpc.api.moonbase.moonbeam.network'],
-  blockExplorerUrls: ['https://moonbase.moonscan.io/']
+  rpcUrls: ['https://testnet-passet-hub-eth-rpc.polkadot.io'],
+  blockExplorerUrls: ['https://polkadot-hub-testnet.subscan.io/']
 }
 
 // Contract ABI (from Remix - paste the FULL ABI here)
