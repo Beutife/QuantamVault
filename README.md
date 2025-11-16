@@ -1,16 +1,75 @@
-# React + Vite
+# **QuantumAI Protocol**
+### *Decentralized Dataset Storage, Monetization & AI Analysis using Arkiv + EVM Smart Contracts*
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+QuantumAI is a decentralized protocol enabling users to upload, store, monetize, and analyze datasets using:
 
-Currently, two official plugins are available:
+- **On-chain smart contracts** for ownership, pricing, and access control  
+- **Arkiv decentralized data layer** for file storage, metadata, TTL, and subscriptions  
+- **EIP-712 wallet signing** for secure operations  
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This creates a complete ecosystem for **AI datasets, research files, and digital knowledge markets**.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Features
 
-## Expanding the ESLint configuration
+### **🧠 Smart Contract Features**
+- Upload datasets with:
+  - Dataset CID
+  - Optional analysis CID
+  - Public / Private / Paid access modes
+- Sell datasets for ERC-20 tokens
+- Track:
+  - Views  
+  - Downloads  
+  - Publisher earnings  
+- Paginated public dataset listings
+- Reentrancy protection
+- Multi-token payment support
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### **📁 Arkiv Storage Features**
+- File upload → returns CID
+- TTL-based file expiration
+- Update metadata with EIP-712 signatures
+- Delete files securely
+- Real-time updates via WebSockets
+- Query files by metadata or filters
+
+---
+
+## 📦 Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Smart Contracts | Solidity 0.8.24, OpenZeppelin |
+| Storage Layer | Arkiv (Decentralized Data Layer) |
+| Frontend | React, Vite, Wagmi, Viem |
+| Auth | EIP-712 Signing |
+| Wallets | MetaMask, WalletConnect |
+
+---
+
+# 📁 Project Structure
+
+/contracts
+QuantumAi.sol
+/src
+arkiv/
+arkivClient.js
+components/
+pages/
+README.md
+
+
+
+---
+
+# 🔧 Installation
+
+### 1. Install dependencies
+```bash
+npm install
+
+
+ARKIV_API_URL=https://api.arkiv.org
+ARKIV_NETWORK=ethereum
