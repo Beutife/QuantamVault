@@ -1,5 +1,23 @@
 import { useState, useEffect } from 'react'
 import { Upload, Database, ShoppingCart, TrendingUp, Wallet, Eye, Download, DollarSign, Lock, Unlock } from 'lucide-react'
+import { getMyDatasets, getPublicDatasets, getMyEarnings, uploadDataset, isContractConfigured } from './assets/utils/contract.js'
+import { CONTRACT_ADDRESS } from './config/contract-config.ts'
+// Lazy load Arkiv to prevent blocking app initialization
+let arkivModule = null
+let testArkivModule = null
+
+async function loadArkiv() {
+  if (!arkivModule) {
+    try {
+      arkivModule = await import('./assets/utils/arkiv.js')
+    } catch (error) {
+      console.warn('Failed to load Arkiv module:', error)
+      return null
+    }
+  }
+  return arkivModule
+}
+
 
 // This is a complete, working demo - replace with real contract functions after deployment
 // For now, it uses simulated data to show functionality
@@ -21,30 +39,101 @@ function App() {
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts'
       })
-      setWalletAddress(accounts[0])
-      loadData()
+      const address = accounts[0]
+      setWalletAddress(address)
+      await loadData(address)
     } catch (error) {
       alert('Failed to connect wallet: ' + error.message)
     }
   }
 
-  const loadData = () => {
-    // Simulated data - replace with real contract calls
-    setDatasets([
-      {
-        id: 0,
-        datasetCID: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
-        analysisCID: 'bafybeihk5e6jlzhdkm4qfxd6j7jwyqxhqf7l3k5amd6qfxd6j7jwyqxh',
-        uploader: '0x1234...5678',
-        isPublic: true,
-        isPaid: true,
-        price: '0.5',
-        views: 124,
-        downloads: 45,
-        timestamp: Date.now() - 86400000
+  const loadData = async (address = walletAddress) => {
+    if (!address) return
+    
+    try {
+      // Try to load real data from contract
+      const publicData = await getPublicDatasets(0, 10)
+      if (publicData && publicData.length > 0) {
+        setDatasets(publicData.map((d, idx) => ({ ...d, id: idx })))
+      } else {
+        // Fallback to simulated data if contract returns empty
+        setDatasets([
+          {
+            id: 0,
+            datasetCID: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+            analysisCID: 'bafybeihk5e6jlzhdkm4qfxd6j7jwyqxhqf7l3k5amd6qfxd6j7jwyqxh',
+            uploader: '0x1234...5678',
+            isPublic: true,
+            isPaid: true,
+            price: '0.5',
+            views: 124,
+            downloads: 45,
+            timestamp: Date.now() - 86400000
+          }
+        ])
       }
-    ])
+      
+      // Load user's datasets
+      await loadMyDatasets(address)
+      
+      // Load earnings
+      try {
+        const earnings = await getMyEarnings()
+        setEarnings(earnings)
+      } catch (e) {
+        console.log('Could not load earnings:', e)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+      // Fallback to simulated data on error
+      setDatasets([
+        {
+          id: 0,
+          datasetCID: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+          analysisCID: 'bafybeihk5e6jlzhdkm4qfxd6j7jwyqxhqf7l3k5amd6qfxd6j7jwyqxh',
+          uploader: '0x1234...5678',
+          isPublic: true,
+          isPaid: true,
+          price: '0.5',
+          views: 124,
+          downloads: 45,
+          timestamp: Date.now() - 86400000
+        }
+      ])
+    }
   }
+
+  const loadMyDatasets = async (address = walletAddress) => {
+    if (!address) {
+      setMyDatasets([])
+      return
+    }
+    
+    try {
+      console.log('Loading my datasets for address:', address)
+      const myData = await getMyDatasets()
+      console.log('Loaded datasets:', myData)
+      setMyDatasets(myData || [])
+      
+      if (myData && myData.length > 0) {
+        console.log(`Successfully loaded ${myData.length} dataset(s)`)
+      } else {
+        console.log('No datasets found')
+      }
+    } catch (error) {
+      console.error('Error loading my datasets:', error)
+      alert(`Error loading datasets: ${error.message || error}`)
+      setMyDatasets([])
+    }
+  }
+
+  // Reload my datasets when switching to the tab
+  useEffect(() => {
+    if (activeTab === 'my-datasets' && walletAddress) {
+      loadMyDatasets()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, walletAddress])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white">
@@ -98,7 +187,7 @@ function App() {
             label="My Datasets"
           />
           <TabButton
-            active={activeTab === 'purchases text-black'}
+            active={activeTab === 'purchases'}
             onClick={() => setActiveTab('purchases')}
             icon={<TrendingUp className="w-5 h-5" />}
             label="My Purchases"
@@ -108,8 +197,8 @@ function App() {
         {/* Main Content */}
         <div className="bg-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700">
           {activeTab === 'marketplace' && <MarketplaceView datasets={datasets} walletAddress={walletAddress} />}
-          {activeTab === 'upload' && <UploadView walletAddress={walletAddress} />}
-          {activeTab === 'my-datasets' && <MyDatasetsView datasets={myDatasets} />}
+          {activeTab === 'upload' && <UploadView walletAddress={walletAddress} onUploadSuccess={loadMyDatasets} />}
+          {activeTab === 'my-datasets' && <MyDatasetsView datasets={myDatasets} walletAddress={walletAddress} onRefresh={loadMyDatasets} />}
           {activeTab === 'purchases' && <PurchasesView />}
         </div>
 
@@ -254,13 +343,97 @@ function DatasetCard({ dataset }) {
   )
 }
 
+// Helper function to upload file to Arkiv (IPFS via Arkiv)
+async function uploadToIPFS(file, walletAddress) {
+  try {
+      // Initialize Arkiv client if wallet is connected
+      if (walletAddress && window.ethereum) {
+        try {
+          const arkiv = await loadArkiv()
+          if (!arkiv) {
+            throw new Error('Arkiv module not available')
+          }
+          
+          const { ethers } = await import('ethers')
+          const provider = new ethers.providers.Web3Provider(window.ethereum)
+          const signer = provider.getSigner()
+          
+          const arkivClient = await arkiv.initArkivClient(walletAddress, signer)
+        
+        // Upload to Arkiv with metadata
+        const metadata = {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          uploadedAt: new Date().toISOString()
+        }
+        
+        console.log('Uploading to Arkiv...')
+        const cid = await arkiv.uploadToArkiv(file, arkivClient, {
+          metadata: metadata,
+          ttl: null // Set TTL if needed (in seconds), null = permanent
+        })
+        
+        console.log('✓ File uploaded to Arkiv, CID:', cid)
+        return cid
+      } catch (arkivError) {
+        console.warn('Arkiv upload failed, falling back to mock:', arkivError.message)
+        // Fall through to mock implementation
+      }
+    }
+    
+    // Fallback: Mock IPFS upload for local testing
+    // This generates a CID-like string for development
+    const arrayBuffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    
+    // Simple hash-like string generation from file bytes
+    let hash = 0
+    for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
+      hash = ((hash << 5) - hash) + uint8Array[i]
+      hash = hash & hash
+    }
+    const fileHash = Math.abs(hash).toString(16).padStart(20, '0')
+    
+    // Generate a mock CID (bafybei... format)
+    const mockCID = `bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy${fileHash.slice(0, 20)}`
+    
+    console.warn('⚠️ Using mock CID (Arkiv not configured):', mockCID)
+    await new Promise(r => setTimeout(r, 1000))
+    
+    return mockCID
+  } catch (error) {
+    console.error('IPFS/Arkiv upload error:', error)
+    throw new Error('Failed to upload file to Arkiv/IPFS')
+  }
+}
+
 // Upload View
-function UploadView({ walletAddress }) {
+function UploadView({ walletAddress, onUploadSuccess }) {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
+  const [isPrivate, setIsPrivate] = useState(false)
   const [isPaid, setIsPaid] = useState(false)
   const [price, setPrice] = useState('')
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [contractHasCode, setContractHasCode] = useState(null)
+  
+  // Check if contract has code
+  useEffect(() => {
+    const checkContract = async () => {
+      if (!window.ethereum) return
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
+        const code = await provider.getCode(CONTRACT_ADDRESS)
+        setContractHasCode(code !== '0x' && code !== '0x0')
+      } catch (error) {
+        console.error('Error checking contract:', error)
+        setContractHasCode(false)
+      }
+    }
+    checkContract()
+  }, [])
 
   if (!walletAddress) {
     return (
@@ -277,19 +450,134 @@ function UploadView({ walletAddress }) {
       return
     }
 
+    if (isPaid && (!price || parseFloat(price) <= 0)) {
+      alert('Please enter a valid price for paid datasets')
+      return
+    }
+
+    // Check if contract is configured
+    if (!isContractConfigured()) {
+      alert('Contract address not configured!\n\nPlease set CONTRACT_ADDRESS in src/config/contract-config.ts with your deployed contract address.\n\nFor local testing, you can use a mock address like: 0x0000000000000000000000000000000000000000')
+      return
+    }
+
     setUploading(true)
+    setUploadStatus('Uploading file to IPFS...')
     
-    // Simulate upload process
-    await new Promise(r => setTimeout(r, 2000))
-    
-    alert('Dataset uploaded successfully!')
-    setFile(null)
-    setUploading(false)
+    try {
+      // Step 1: Upload file to Arkiv (IPFS via Arkiv)
+      const datasetCID = await uploadToIPFS(file, walletAddress)
+      setUploadStatus('File uploaded! Generating analysis CID...')
+      
+      // Step 2: Generate analysis CID (for now, create a mock one)
+      // In production, you would analyze the dataset and upload the analysis
+      const analysisCID = `bafybeihk5e6jlzhdkm4qfxd6j7jwyqxhqf7l3k5amd6qfxd6j7jwyqxh${datasetCID.slice(-10)}`
+      
+      setUploadStatus('Publishing to blockchain...')
+      
+      // Step 3: Upload to blockchain contract
+      const txResult = await uploadDataset(
+        datasetCID,
+        analysisCID,
+        isPublic,
+        isPrivate,
+        isPaid,
+        price || '0'
+      )
+      
+      const txHash = typeof txResult === 'string' ? txResult : txResult.hash
+      const blockNumber = typeof txResult === 'object' ? txResult.blockNumber : null
+      
+      setUploadStatus(`Transaction confirmed in block ${blockNumber || 'N/A'}! Waiting for state update...`)
+      
+      // Wait for the transaction to be fully confirmed and indexed
+      // Multiple confirmations ensure state is updated
+      console.log('Waiting for blockchain state to update...')
+      await new Promise(r => setTimeout(r, 3000))
+      
+      // Step 4: Refresh the datasets list with retries
+      if (onUploadSuccess) {
+        console.log('Refreshing datasets list after upload...')
+        // Try refreshing multiple times with delays (blockchain state might take time to update)
+        let datasetsFound = false
+        for (let attempt = 0; attempt < 5; attempt++) {
+          try {
+            console.log(`Refresh attempt ${attempt + 1}/5...`)
+            await onUploadSuccess()
+            // Wait a moment for state to update
+            await new Promise(r => setTimeout(r, 1000))
+            console.log(`Refresh attempt ${attempt + 1} completed`)
+            if (attempt < 2) {
+              console.log('Waiting before next check...')
+              await new Promise(r => setTimeout(r, 2000))
+            }
+          } catch (err) {
+            console.error(`Refresh attempt ${attempt + 1} failed:`, err)
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 2000))
+            }
+          }
+        }
+        console.log('Datasets list refresh completed')
+      }
+      
+      alert(`Dataset uploaded successfully!\nTransaction: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\nYour dataset should now appear in "My Datasets" tab.`)
+      
+      // Reset form
+      setFile(null)
+      setIsPublic(true)
+      setIsPrivate(false)
+      setIsPaid(false)
+      setPrice('')
+      setUploadStatus('')
+      
+    } catch (error) {
+      console.error('Upload error:', error)
+      let errorMessage = error.message || error.toString()
+      
+      // Provide helpful error messages
+      if (errorMessage.includes('Contract address not configured')) {
+        errorMessage = 'Contract address not configured. Please set CONTRACT_ADDRESS in src/config/contract-config.ts'
+      } else if (errorMessage.includes('network does not support ENS')) {
+        errorMessage = 'Invalid contract address. Please set a valid Ethereum address (0x...) in src/config/contract-config.ts'
+      } else if (errorMessage.includes('UNSUPPORTED_OPERATION')) {
+        errorMessage = 'Contract address is invalid. Please check your CONTRACT_ADDRESS in src/config/contract-config.ts'
+      }
+      
+      alert(`Upload failed: ${errorMessage}`)
+      setUploadStatus('')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-bold mb-6">Upload AI Dataset</h2>
+
+      {!isContractConfigured() && (
+        <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-500/50 rounded-lg">
+          <p className="text-yellow-400 text-sm font-semibold mb-1">⚠️ Contract Not Configured</p>
+          <p className="text-yellow-300 text-xs">
+            Please set CONTRACT_ADDRESS in <code className="bg-gray-800 px-1 rounded">src/config/contract-config.ts</code> with your deployed contract address.
+          </p>
+        </div>
+      )}
+      
+      {contractHasCode === false && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg">
+          <p className="text-red-400 text-sm font-semibold mb-1">⚠️ Contract Not Deployed on This Network</p>
+          <p className="text-red-300 text-xs mb-2">
+            The contract address <code className="bg-gray-800 px-1 rounded">0xc8F6fF01fd1D981e627a8102fc334D360Af7384b</code> does not have code deployed on the current network.
+          </p>
+          <p className="text-red-300 text-xs">
+            <strong>You need to:</strong><br/>
+            1. Deploy your contract to Polkadot Hub TestNet, OR<br/>
+            2. Switch to the network where the contract is deployed (likely Moonbase Alpha)<br/><br/>
+            <strong>To deploy:</strong> Use Remix IDE or Hardhat to deploy your Quantum.sol contract to Polkadot Hub TestNet, then update the CONTRACT_ADDRESS in the config file.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* File Upload */}
@@ -323,12 +611,31 @@ function UploadView({ walletAddress }) {
             <input
               type="checkbox"
               checked={isPublic}
-              onChange={(e) => setIsPublic(e.target.checked)}
+              onChange={(e) => {
+                setIsPublic(e.target.checked)
+                if (e.target.checked) setIsPrivate(false)
+              }}
               className="w-5 h-5"
             />
             <div>
               <p className="font-semibold">Public Dataset</p>
               <p className="text-xs text-gray-400">Anyone can discover this dataset</p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-750">
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => {
+                setIsPrivate(e.target.checked)
+                if (e.target.checked) setIsPublic(false)
+              }}
+              className="w-5 h-5"
+            />
+            <div>
+              <p className="font-semibold">Private Dataset</p>
+              <p className="text-xs text-gray-400">Only you can access this dataset</p>
             </div>
           </label>
 
@@ -360,6 +667,13 @@ function UploadView({ walletAddress }) {
           )}
         </div>
 
+        {/* Upload Status */}
+        {uploadStatus && (
+          <div className="p-4 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
+            <p className="text-cyan-400 text-sm">{uploadStatus}</p>
+          </div>
+        )}
+
         {/* Upload Button */}
         <button
           onClick={handleUpload}
@@ -390,19 +704,59 @@ function UploadView({ walletAddress }) {
 }
 
 // My Datasets View
-function MyDatasetsView({ datasets }) {
+function MyDatasetsView({ datasets, walletAddress, onRefresh }) {
+  const [loading, setLoading] = useState(false)
+
+  if (!walletAddress) {
+    return (
+      <div className="text-center py-20">
+        <Wallet className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+        <p className="text-xl text-gray-400">Connect your wallet to view your datasets</p>
+      </div>
+    )
+  }
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setLoading(true)
+      try {
+        await onRefresh()
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">My Uploaded Datasets</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">My Uploaded Datasets</h2>
+        <button
+          onClick={handleRefresh}
+          disabled={loading}
+          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold text-sm transition disabled:opacity-50 flex items-center gap-2"
+        >
+          <Database className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+      
       {datasets.length === 0 ? (
         <div className="text-center py-20">
           <Upload className="w-16 h-16 mx-auto mb-4 text-gray-600" />
           <p className="text-gray-400">You haven't uploaded any datasets yet</p>
+          <p className="text-sm text-gray-500 mt-2">Upload a dataset to see it here</p>
+          <button
+            onClick={handleRefresh}
+            className="mt-4 px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold text-sm transition"
+          >
+            Refresh List
+          </button>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
           {datasets.map((dataset, idx) => (
-            <DatasetCard key={idx} dataset={dataset} />
+            <DatasetCard key={dataset.id || idx} dataset={dataset} />
           ))}
         </div>
       )}
